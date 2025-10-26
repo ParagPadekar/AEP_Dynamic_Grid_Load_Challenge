@@ -1,8 +1,8 @@
-# IEEE 738 Dynamic Line Rating System
+# Dynamic Grid Monitoring System
 
 > Real-time transmission line capacity monitoring with weather-based calculations for Hawaii's 40-bus power grid
 
-[![Built for HackOHIO 2024](https://img.shields.io/badge/Built%20for-HackOHIO%202024-8b5cf6)](https://hack.osu.edu/)
+[![Built for HackOHIO 2025](https://img.shields.io/badge/Built%20for-HackOHIO%202024-8b5cf6)](https://hack.osu.edu/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## 🌟 Overview

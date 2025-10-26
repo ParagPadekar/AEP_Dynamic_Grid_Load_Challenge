@@ -6,7 +6,7 @@
 import axios from 'axios';
 
 // API Base URL - change this if backend is on different host/port
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://aep-dlr-backend.onrender.com';
 
 // Create axios instance with default config
 const api = axios.create({

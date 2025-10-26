@@ -109,7 +109,8 @@ def load_data():
     """Load transmission line data from CSV files"""
     global lines_data, load_predictor, weather_service
 
-    data_dir = os.path.join(os.path.dirname(__file__), '..', 'osu_hackathon', 'hawaii40_osu', 'csv')
+    # Look for data in backend/data directory
+    data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
     lines_data = pd.read_csv(os.path.join(data_dir, 'lines.csv'))
     buses_data = pd.read_csv(os.path.join(data_dir, 'buses.csv'))

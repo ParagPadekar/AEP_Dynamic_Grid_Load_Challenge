@@ -1,0 +1,21 @@
+/* Charts Component Styles */
+.charts-container { width: 100%; max-width: none; padding: 0; }
+.chart-header { margin-bottom: 1.5rem; }
+.chart-header h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.line-info { display: flex; gap: 1.5rem; font-size: 0.9rem; color: var(--text-secondary); flex-wrap: wrap; }
+.chart-section { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.chart-section h3 { font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-primary); }
+.chart-section.half-width { flex: 1; min-width: 400px; }
+.charts-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0; }
+.comparison-table-section { margin-top: 2rem; }
+.comparison-table { width: 100%; border-collapse: collapse; background-color: var(--bg-secondary); border-radius: 8px; overflow: hidden; }
+.comparison-table thead { background-color: var(--bg-tertiary); }
+.comparison-table th { padding: 0.875rem; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border-color); }
+.comparison-table td { padding: 0.75rem; border-bottom: 1px solid var(--border-color); font-size: 0.9rem; }
+.comparison-table .positive { color: var(--success-color); font-weight: 600; }
+.comparison-table .negative { color: var(--danger-color); font-weight: 600; }
+.comparison-table .badge-critical, .comparison-table .badge-warning, .comparison-table .badge-normal { padding: 0.35rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
+.comparison-table .badge-critical { background-color: rgba(239, 68, 68, 0.2); color: var(--danger-color); }
+.comparison-table .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: var(--warning-color); }
+.comparison-table .badge-normal { background-color: rgba(16, 185, 129, 0.2); color: var(--success-color); }
+.charts-placeholder, .charts-loading { text-align: center; padding: 4rem; color: var(--text-secondary); font-size: 1.1rem; }

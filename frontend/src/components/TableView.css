@@ -1,0 +1,39 @@
+/* TableView Styles */
+.table-view { max-width: 100%; padding: 1rem; }
+.table-controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+.search-box input { padding: 0.75rem 1rem; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); width: 250px; font-size: 0.95rem; }
+.filter-buttons { display: flex; gap: 0.5rem; }
+.filter-buttons button { padding: 0.6rem 1rem; background-color: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; cursor: pointer; font-size: 0.875rem; transition: all 0.2s; }
+.filter-buttons button.active { border-color: var(--primary-color); background-color: var(--primary-color); color: white; }
+.filter-buttons button.active.critical { background-color: var(--danger-color); border-color: var(--danger-color); }
+.filter-buttons button.active.warning { background-color: var(--warning-color); border-color: var(--warning-color); }
+.filter-buttons button.active.normal { background-color: var(--success-color); border-color: var(--success-color); }
+.refresh-btn { padding: 0.6rem 1rem; background-color: var(--primary-color); color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: auto; }
+.table-container { overflow-x: auto; border-radius: 12px; }
+.lines-table { width: 100%; border-collapse: collapse; background-color: var(--bg-secondary); }
+.lines-table thead { background-color: var(--bg-tertiary); }
+.lines-table th { padding: 1rem; text-align: left; font-weight: 600; cursor: pointer; user-select: none; border-bottom: 2px solid var(--border-color); }
+.lines-table th:hover { background-color: var(--bg-primary); }
+.lines-table tbody tr { border-bottom: 1px solid var(--border-color); transition: all 0.2s; }
+.lines-table tbody tr:hover { background-color: var(--bg-tertiary); }
+.lines-table td { padding: 0.875rem 1rem; font-size: 0.9rem; }
+.status-badge { padding: 0.35rem 0.75rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+.badge-critical { background-color: rgba(239, 68, 68, 0.2); color: var(--danger-color); border: 1px solid var(--danger-color); }
+.badge-warning { background-color: rgba(245, 158, 11, 0.2); color: var(--warning-color); border: 1px solid var(--warning-color); }
+.badge-normal { background-color: rgba(16, 185, 129, 0.2); color: var(--success-color); border: 1px solid var(--success-color); }
+.utilization-cell { display: flex; flex-direction: column; gap: 0.25rem; }
+.utilization-value { font-weight: 600; }
+.mini-bar { height: 4px; width: 80px; background-color: var(--bg-tertiary); border-radius: 2px; overflow: hidden; }
+.mini-bar-fill { height: 100%; transition: width 0.3s; }
+.mini-bar-fill.critical { background-color: var(--danger-color); }
+.mini-bar-fill.warning { background-color: var(--warning-color); }
+.mini-bar-fill.normal { background-color: var(--success-color); }
+/* Rating Columns */
+.rating-col { text-align: center; }
+.rating-col strong { display: block; font-size: 1rem; margin-bottom: 0.15rem; }
+.rating-note { font-size: 0.75rem; color: var(--text-secondary); font-weight: normal; }
+
+.view-btn { padding: 0.5rem 1rem; background-color: var(--primary-color); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; }
+.view-btn:hover { background-color: #7c3aed; }
+.table-footer { margin-top: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem; }
+.no-results { padding: 3rem; text-align: center; color: var(--text-secondary); }

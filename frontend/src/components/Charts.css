@@ -1,5 +1,5 @@
 /* Charts Component Styles */
-.charts-container { width: 100%; max-width: none; padding: 0; }
+.charts-container { width: 100%; max-width: 100%; padding: 1.5rem; }
 .chart-header { margin-bottom: 1.5rem; }
 .chart-header h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
 .line-info { display: flex; gap: 1.5rem; font-size: 0.9rem; color: var(--text-secondary); flex-wrap: wrap; }
@@ -19,3 +19,56 @@
 .comparison-table .badge-warning { background-color: rgba(245, 158, 11, 0.2); color: var(--warning-color); }
 .comparison-table .badge-normal { background-color: rgba(16, 185, 129, 0.2); color: var(--success-color); }
 .charts-placeholder, .charts-loading { text-align: center; padding: 4rem; color: var(--text-secondary); font-size: 1.1rem; }
+
+/* Chart descriptions */
+.chart-description {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+/* Insights Grid */
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.insight-card {
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.insight-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+  border-color: var(--primary-color);
+}
+
+.insight-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.insight-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.insight-note {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}

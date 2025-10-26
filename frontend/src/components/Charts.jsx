@@ -22,7 +22,7 @@ import {
 import apiService from '../services/api';
 import './Charts.css';
 
-const Charts = ({ selectedLine, selectedScenario }) => {
+const Charts = ({ selectedLine, selectedScenario, customWeather }) => {
   const [loadPrediction, setLoadPrediction] = useState([]);
   const [scenarioComparison, setScenarioComparison] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ const Charts = ({ selectedLine, selectedScenario }) => {
     if (selectedLine) {
       fetchChartData();
     }
-  }, [selectedLine, selectedScenario]);
+  }, [selectedLine, selectedScenario, JSON.stringify(customWeather)]);
 
   const fetchChartData = async () => {
     setLoading(true);
@@ -39,8 +39,9 @@ const Charts = ({ selectedLine, selectedScenario }) => {
       // Fetch load prediction
       const loadData = await apiService.predictLoad(selectedLine, 24);
       setLoadPrediction(
-        loadData.predictions.map((p) => ({
+        loadData.predictions.map((p, index) => ({
           hour: p.hour,
+          hourLabel: `Hour ${index + 1}`,
           timestamp: new Date(p.timestamp).toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
@@ -50,19 +51,17 @@ const Charts = ({ selectedLine, selectedScenario }) => {
         }))
       );
 
-      // Try to fetch scenario comparison (only available in main_weather.py)
+      // Fetch current line details for the selected scenario
       try {
         const comparisonData = await apiService.compareScenarios(selectedLine, [
-          'extreme_heat',
-          'hot_day',
-          'normal_summer',
-          'optimal',
-          'windy_day',
+          'critical_evening',
+          'warning_midday',
+          'normal_midday',
+          'optimal_early',
         ]);
         setScenarioComparison(comparisonData);
       } catch (err) {
-        console.warn('Scenario comparison not available (requires main_weather.py backend)');
-        // Set null to hide scenario comparison charts
+        console.warn('Scenario comparison not available');
         setScenarioComparison(null);
       }
     } catch (err) {
@@ -126,175 +125,87 @@ const Charts = ({ selectedLine, selectedScenario }) => {
   return (
     <div className="charts-container">
       <div className="chart-header">
-        <h2>Line Analysis: {selectedLine}</h2>
+        <h2>Line Details: {selectedLine}</h2>
         {scenarioComparison && (
           <div className="line-info">
-            <span>{scenarioComparison.line_name}</span>
-            <span>{scenarioComparison.conductor}</span>
-            <span>Static Rating: {scenarioComparison.static_rating_mva} MVA</span>
+            <span><strong>{scenarioComparison.line_name}</strong></span>
+            <span>Conductor: {scenarioComparison.conductor}</span>
+            <span>Static Rating: <strong>{scenarioComparison.static_rating_mva} MVA</strong></span>
           </div>
         )}
       </div>
 
-      {/* Load Prediction Chart */}
+      {/* 24-Hour Load Forecast - MOST IMPORTANT for showing time-of-day patterns */}
       <div className="chart-section">
-        <h3>📈 24-Hour Load Forecast</h3>
-        <ResponsiveContainer width="100%" height={350}>
+        <h3>24-Hour Load Forecast (Time-of-Day Patterns)</h3>
+        <p className="chart-description">
+          Shows how load varies throughout the day based on real utility patterns -
+          minimum at 6 AM (90%), peak at 6 PM (110%)
+        </p>
+        <ResponsiveContainer width="100%" height={400}>
           <LineChart data={loadPrediction}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="timestamp" />
+            <XAxis
+              dataKey="hourLabel"
+              label={{ value: 'Next 24 Hours', position: 'insideBottom', offset: -5 }}
+            />
             <YAxis
               yAxisId="left"
               label={{ value: 'Load (MW)', angle: -90, position: 'insideLeft' }}
             />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              label={{ value: 'Current (A)', angle: 90, position: 'insideRight' }}
+            <Tooltip
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div style={{
+                      backgroundColor: 'var(--bg-tertiary)',
+                      border: '2px solid var(--primary-color)',
+                      borderRadius: '8px',
+                      padding: '10px'
+                    }}>
+                      <p style={{ margin: 0, fontWeight: 'bold' }}>{data.hourLabel}</p>
+                      <p style={{ margin: '5px 0 0 0', fontSize: '0.9em', color: 'var(--text-secondary)' }}>
+                        Time: {data.timestamp}
+                      </p>
+                      <p style={{ margin: '5px 0 0 0', color: '#8b5cf6', fontWeight: 'bold' }}>
+                        Load: {data.load.toFixed(2)} MW
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
             />
-            <Tooltip />
             <Legend />
             <Line
               yAxisId="left"
               type="monotone"
               dataKey="load"
               stroke="#8b5cf6"
-              strokeWidth={2}
+              strokeWidth={3}
               name="Predicted Load (MW)"
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="current"
-              stroke="#06b6d4"
-              strokeWidth={2}
-              name="Current (A)"
-              strokeDasharray="5 5"
+              dot={{ fill: '#8b5cf6', r: 4 }}
             />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Scenario Comparison - Ampacity */}
-      <div className="chart-section">
-        <h3>⚡ Ampacity Across Weather Scenarios</h3>
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={comparisonChartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="scenario" />
-            <YAxis label={{ value: 'Ampacity (A)', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="ampacity" fill="#8b5cf6" name="Ampacity (A)">
-              {comparisonChartData.map((entry, index) => {
-                const color =
-                  entry.utilization > 95
-                    ? '#ef4444'
-                    : entry.utilization > 80
-                    ? '#f59e0b'
-                    : '#10b981';
-                return <Cell key={`cell-${index}`} fill={color} />;
-              })}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Scenario Comparison - Utilization */}
-      <div className="chart-section">
-        <h3>📊 Utilization Percentage by Scenario</h3>
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={comparisonChartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="scenario" />
-            <YAxis
-              label={{ value: 'Utilization (%)', angle: -90, position: 'insideLeft' }}
-            />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="utilization" fill="#06b6d4" name="Utilization (%)">
-              {comparisonChartData.map((entry, index) => {
-                const color =
-                  entry.utilization > 95
-                    ? '#ef4444'
-                    : entry.utilization > 80
-                    ? '#f59e0b'
-                    : '#10b981';
-                return <Cell key={`cell-${index}`} fill={color} />;
-              })}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Two-column layout for weather and status */}
-      <div className="charts-row">
-        {/* Weather Conditions */}
-        <div className="chart-section half-width">
-          <h3>🌡️ Weather Conditions</h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={comparisonChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis
-                dataKey="scenario"
-                angle={-45}
-                textAnchor="end"
-                height={80}
-                interval={0}
-                tick={{ fontSize: 11 }}
-              />
-              <YAxis
-                label={{ value: 'Value', angle: -90, position: 'insideLeft' }}
-              />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="temp" fill="#ef4444" name="Temp (°C)" />
-              <Bar dataKey="wind" fill="#06b6d4" name="Wind (m/s)" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Status Distribution */}
-        {statusData.length > 0 && (
-          <div className="chart-section half-width">
-            <h3>🎯 Status Distribution</h3>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) =>
-                    `${name}: ${(percent * 100).toFixed(0)}%`
-                  }
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-
-      {/* Comparison Table */}
+      {/* Scenario Comparison Table - Clean and informative */}
       {scenarioComparison && (
         <div className="comparison-table-section">
-          <h3>📋 Detailed Comparison</h3>
+          <h3>How Weather Affects This Line</h3>
+          <p className="chart-description">
+            Comparison across different weather scenarios showing how temperature and wind affect line capacity
+          </p>
           <table className="comparison-table">
             <thead>
               <tr>
                 <th>Scenario</th>
-                <th>Temperature</th>
+                <th>Temp</th>
                 <th>Wind</th>
-                <th>Ampacity</th>
-                <th>vs Static</th>
+                <th>Dynamic Capacity</th>
+                <th>vs Static Rating</th>
                 <th>Utilization</th>
                 <th>Status</th>
               </tr>
@@ -307,15 +218,14 @@ const Charts = ({ selectedLine, selectedScenario }) => {
                   100;
                 return (
                   <tr key={idx}>
-                    <td>{comp.scenario.replace('_', ' ')}</td>
+                    <td><strong>{comp.scenario.replace('_', ' ')}</strong></td>
                     <td>{comp.weather.temperature_c}°C</td>
                     <td>{comp.weather.wind_speed_ms} m/s</td>
-                    <td>{Math.round(comp.ampacity)} A</td>
+                    <td><strong>{comp.ampacity_mva.toFixed(1)} MVA</strong></td>
                     <td className={vsStatic >= 0 ? 'positive' : 'negative'}>
-                      {vsStatic >= 0 ? '+' : ''}
-                      {vsStatic.toFixed(1)}%
+                      <strong>{vsStatic >= 0 ? '+' : ''}{vsStatic.toFixed(1)}%</strong>
                     </td>
-                    <td>{comp.utilization_pct.toFixed(1)}%</td>
+                    <td><strong>{comp.utilization_pct.toFixed(1)}%</strong></td>
                     <td>
                       <span className={`badge-${comp.status.toLowerCase()}`}>
                         {comp.status}
@@ -326,6 +236,38 @@ const Charts = ({ selectedLine, selectedScenario }) => {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Key Takeaway Summary */}
+      {scenarioComparison && (
+        <div className="chart-section">
+          <h3>Key Insights</h3>
+          <div className="insights-grid">
+            <div className="insight-card">
+              <div className="insight-label">Best Conditions</div>
+              <div className="insight-value">
+                {Math.max(...scenarioComparison.comparisons.map(c => c.ampacity_mva)).toFixed(0)} MVA
+              </div>
+              <div className="insight-note">Cool temp + strong wind</div>
+            </div>
+            <div className="insight-card">
+              <div className="insight-label">Worst Conditions</div>
+              <div className="insight-value">
+                {Math.min(...scenarioComparison.comparisons.map(c => c.ampacity_mva)).toFixed(0)} MVA
+              </div>
+              <div className="insight-note">High heat + low wind</div>
+            </div>
+            <div className="insight-card">
+              <div className="insight-label">Capacity Range</div>
+              <div className="insight-value">
+                {((Math.max(...scenarioComparison.comparisons.map(c => c.ampacity_mva)) -
+                   Math.min(...scenarioComparison.comparisons.map(c => c.ampacity_mva))) /
+                   scenarioComparison.static_rating_mva * 100).toFixed(0)}%
+              </div>
+              <div className="insight-note">Weather impact on capacity</div>
+            </div>
+          </div>
         </div>
       )}
     </div>

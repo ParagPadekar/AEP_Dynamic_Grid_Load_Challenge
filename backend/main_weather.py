@@ -109,11 +109,16 @@ def load_data():
     """Load transmission line data from CSV files"""
     global lines_data, load_predictor, weather_service
 
-    # Look for data in backend/data directory
-    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    # Look for data in osu_hackathon repository
+    current_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(current_dir, '..', 'osu_hackathon', 'hawaii40_osu', 'csv')
 
     lines_data = pd.read_csv(os.path.join(data_dir, 'lines.csv'))
     buses_data = pd.read_csv(os.path.join(data_dir, 'buses.csv'))
+
+    # Load actual power flow data from PyPSA solution (theoretically correct approach)
+    flows_path = os.path.join(current_dir, '..', 'osu_hackathon', 'hawaii40_osu', 'line_flows_nominal.csv')
+    flows_data = pd.read_csv(flows_path)
 
     lines_data = lines_data.merge(
         buses_data[['name', 'v_nom']],
@@ -125,9 +130,18 @@ def load_data():
     lines_data.rename(columns={'v_nom': 'voltage_kv'}, inplace=True)
     lines_data.drop(columns=['name_bus'], inplace=True, errors='ignore')
 
+    # Merge actual power flow data
+    lines_data = lines_data.merge(
+        flows_data[['name', 'p0_nominal']],
+        on='name',
+        how='left'
+    )
+
     load_predictor = LoadPredictor()
     for _, line in lines_data.iterrows():
-        baseline_mw = line['s_nom'] * 0.7
+        # Use actual power flow from PyPSA solution instead of arbitrary percentage
+        # This respects network physics (Kirchhoff's laws, impedances, AC power flow)
+        baseline_mw = line['p0_nominal'] if pd.notna(line.get('p0_nominal')) else line['s_nom'] * 0.7
         load_predictor.set_baseline_load(line['name'], baseline_mw)
 
     # Initialize weather service
@@ -188,10 +202,15 @@ def calculate_line_with_weather(
     ampacity_mva = calculate_mva_from_current(ampacity_amps, voltage_kv)
 
     # Predict load with weather sensitivity
+    # Use hour_of_day from weather data if available (for time-aware scenarios)
+    timestamp = datetime.now()
+    if hasattr(weather, 'hour_of_day') and weather.hour_of_day is not None:
+        timestamp = timestamp.replace(hour=int(weather.hour_of_day))
+
     predicted_current_data = load_predictor.predict_line_current(
         line_data['name'],
         voltage_kv,
-        timestamp=datetime.now(),
+        timestamp=timestamp,
         temperature_c=weather.temperature_c,
         wind_speed_ms=weather.wind_speed_ms,
         solar_altitude=weather.solar_altitude,
@@ -531,6 +550,335 @@ async def predict_load(request: LoadPredictionRequest):
     return {
         "line_id": request.line_id,
         "predictions": predictions
+    }
+
+
+@app.get("/timelapse/24hour")
+async def get_24hour_timelapse(
+    weather_source: str = Query("manual", description="Weather source: 'scenario', 'live', or 'manual'"),
+    scenario_name: str = Query("normal_midday", description="Scenario name if using scenario weather"),
+    temp_ambient_c: float = Query(30.0, description="Base temperature in Celsius"),
+    wind_speed_ms: float = Query(2.0, description="Wind speed in m/s"),
+    humidity_pct: float = Query(70.0, description="Humidity percentage")
+):
+    """
+    Get grid state for all 24 hours of the day for time-lapse animation.
+
+    Returns hourly snapshots showing how line utilization changes throughout the day
+    based on load patterns and solar heating.
+
+    Perfect for animated dashboard visualization!
+    """
+    if lines_data is None or weather_service is None or load_predictor is None:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    hourly_snapshots = []
+
+    # Process each hour of the day
+    for hour in range(24):
+        # Calculate solar altitude based on hour (approximate for Hawaii ~21°N)
+        # Solar noon at hour 12, sunrise ~6, sunset ~18
+        if hour < 6 or hour > 18:
+            solar_altitude = 0.0  # Night
+        elif hour == 12:
+            solar_altitude = 75.0  # Solar noon
+        else:
+            hours_from_noon = abs(12 - hour)
+            solar_altitude = max(0, 75 - (hours_from_noon * 10))
+
+        # Get weather for this hour
+        try:
+            if weather_source == "live":
+                weather = weather_service.get_weather_live()
+            elif weather_source == "scenario":
+                weather = weather_service.get_weather_scenario(scenario_name)
+            else:  # manual
+                weather = weather_service.get_weather_manual(
+                    temp_ambient_c,
+                    wind_speed_ms,
+                    solar_altitude,
+                    90.0,  # wind angle
+                    humidity_pct
+                )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Weather error at hour {hour}: {str(e)}")
+
+        # Calculate for all lines at this hour
+        hour_lines = []
+        for _, line in lines_data.iterrows():
+            try:
+                # Get time-based load factor
+                load_factor = load_predictor.hourly_profile.get(hour, 1.0)
+
+                # Calculate IEEE 738 ampacity
+                conductor_params = get_conductor_params(line['conductor'])
+                calc = IEEE738Calculator(
+                    conductor_diameter_m=conductor_params['diameter_m'],
+                    resistance_25C=conductor_params['R_ohm_per_m'],
+                    emissivity=0.5,
+                    absorptivity=0.5,
+                    resistance_temp_coeff=conductor_params['temp_coeff']
+                )
+
+                ampacity_details = calc.calculate_ampacity_detailed(
+                    temp_ambient_c=weather.temperature_c,
+                    wind_speed_ms=weather.wind_speed_ms,
+                    wind_angle_deg=weather.wind_angle_deg,
+                    solar_altitude=weather.solar_altitude,
+                    temp_conductor_max_c=line['MOT']
+                )
+
+                ampacity_amps = ampacity_details['ampacity']
+
+                voltage_kv = line['voltage_kv']
+                ampacity_mva = (ampacity_amps * voltage_kv * np.sqrt(3)) / 1000
+
+                # Get baseline load and apply hourly factor
+                baseline_load_mw = line.get('p0_nominal', 0)
+                predicted_load_mw = baseline_load_mw * load_factor
+                predicted_current_a = (predicted_load_mw * 1000) / (voltage_kv * np.sqrt(3))
+
+                # Calculate utilization
+                utilization_pct = (predicted_current_a / ampacity_amps * 100) if ampacity_amps > 0 else 0
+
+                # Determine status
+                if utilization_pct >= 95:
+                    status = "Critical"
+                elif utilization_pct >= 80:
+                    status = "Warning"
+                else:
+                    status = "Normal"
+
+                hour_lines.append({
+                    "line_id": line['name'],
+                    "utilization_pct": round(float(utilization_pct), 1),
+                    "status": status,
+                    "ampacity_mva": round(float(ampacity_mva), 1),
+                    "predicted_load_mw": round(float(predicted_load_mw), 1)
+                })
+
+            except Exception as e:
+                print(f"Error processing line {line['name']} at hour {hour}: {e}")
+                continue
+
+        # Count statuses for this hour
+        critical_count = sum(1 for l in hour_lines if l['status'] == 'Critical')
+        warning_count = sum(1 for l in hour_lines if l['status'] == 'Warning')
+        normal_count = sum(1 for l in hour_lines if l['status'] == 'Normal')
+
+        hourly_snapshots.append({
+            "hour": hour,
+            "time_label": f"{hour:02d}:00",
+            "solar_altitude": round(solar_altitude, 1),
+            "load_factor": round(load_predictor.hourly_profile.get(hour, 1.0), 3),
+            "lines": hour_lines,
+            "summary": {
+                "total_lines": len(hour_lines),
+                "critical": critical_count,
+                "warning": warning_count,
+                "normal": normal_count
+            }
+        })
+
+    return {
+        "weather_base": {
+            "temperature_c": temp_ambient_c,
+            "wind_speed_ms": wind_speed_ms,
+            "humidity_pct": humidity_pct
+        },
+        "total_hours": 24,
+        "snapshots": hourly_snapshots
+    }
+
+
+@app.get("/contingency/n1/{failed_line_id}")
+async def n1_contingency_analysis(
+    failed_line_id: str,
+    weather_source: str = Query("manual", description="Weather source"),
+    scenario_name: str = Query("normal_midday", description="Scenario name"),
+    temp_ambient_c: float = Query(30.0, description="Temperature in Celsius"),
+    wind_speed_ms: float = Query(2.5, description="Wind speed in m/s"),
+    humidity_pct: float = Query(70.0, description="Humidity percentage")
+):
+    """
+    N-1 Contingency Analysis: What happens if a line fails?
+
+    Simulates the outage of a transmission line and shows how power redistributes
+    to other lines, identifying potential overloads and cascade failures.
+
+    This is a simplified analysis using power redistribution heuristics.
+    In production, this would use full AC power flow (PyPSA/MATPOWER).
+    """
+    if lines_data is None or weather_service is None or load_predictor is None:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    # Find the failed line
+    failed_line = lines_data[lines_data['name'] == failed_line_id]
+    if failed_line.empty:
+        raise HTTPException(status_code=404, detail=f"Line {failed_line_id} not found")
+
+    failed_line = failed_line.iloc[0]
+
+    # Get weather
+    try:
+        if weather_source == "live":
+            weather = weather_service.get_weather_live()
+        elif weather_source == "scenario":
+            weather = weather_service.get_weather_scenario(scenario_name)
+        else:
+            weather = weather_service.get_weather_manual(
+                temp_ambient_c, wind_speed_ms, 45.0, 90.0, humidity_pct
+            )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Weather error: {str(e)}")
+
+    # Get current hour for load factor
+    current_hour = datetime.now().hour
+    load_factor = load_predictor.hourly_profile.get(current_hour, 1.0)
+
+    # Calculate baseline state (no outage)
+    baseline_state = []
+    for _, line in lines_data.iterrows():
+        try:
+            baseline_load_mw = line.get('p0_nominal', 0) * load_factor
+            baseline_state.append({
+                'line_id': line['name'],
+                'baseline_flow_mw': float(baseline_load_mw),
+                'bus0': int(line['bus0']),
+                'bus1': int(line['bus1']),
+                'impedance': float(line.get('x', 1.0))  # Use reactance as proxy for impedance
+            })
+        except Exception as e:
+            continue
+
+    # Find parallel/alternative paths
+    # Lines that share a bus with the failed line are candidates for redistribution
+    failed_bus0 = failed_line['bus0']
+    failed_bus1 = failed_line['bus1']
+    failed_flow = failed_line.get('p0_nominal', 0) * load_factor
+
+    affected_lines = []
+    for state in baseline_state:
+        if state['line_id'] == failed_line_id:
+            continue
+
+        # Check if line is connected to either end of failed line
+        is_parallel = (
+            (state['bus0'] == failed_bus0 or state['bus0'] == failed_bus1) or
+            (state['bus1'] == failed_bus0 or state['bus1'] == failed_bus1)
+        )
+
+        if is_parallel:
+            affected_lines.append(state)
+
+    # Redistribute failed line's power to parallel paths
+    # Simple heuristic: distribute inversely proportional to impedance
+    if affected_lines:
+        total_conductance = sum(1.0 / max(line['impedance'], 0.01) for line in affected_lines)
+
+        for affected in affected_lines:
+            conductance = 1.0 / max(affected['impedance'], 0.01)
+            redistribution_factor = conductance / total_conductance
+            additional_flow = failed_flow * redistribution_factor
+            affected['contingency_flow_mw'] = affected['baseline_flow_mw'] + additional_flow
+            affected['flow_increase_mw'] = additional_flow
+            affected['flow_increase_pct'] = (additional_flow / max(affected['baseline_flow_mw'], 0.1)) * 100
+
+    # Calculate ampacity and status for affected lines
+    contingency_results = []
+    overloaded_count = 0
+    critical_count = 0
+    warning_count = 0
+
+    for affected in affected_lines:
+        line_data = lines_data[lines_data['name'] == affected['line_id']].iloc[0]
+
+        try:
+            # Calculate ampacity
+            conductor_params = get_conductor_params(line_data['conductor'])
+            calc = IEEE738Calculator(
+                conductor_diameter_m=conductor_params['diameter_m'],
+                resistance_25C=conductor_params['R_ohm_per_m'],
+                emissivity=0.5,
+                absorptivity=0.5,
+                resistance_temp_coeff=conductor_params['temp_coeff']
+            )
+
+            ampacity_details = calc.calculate_ampacity_detailed(
+                temp_ambient_c=weather.temperature_c,
+                wind_speed_ms=weather.wind_speed_ms,
+                wind_angle_deg=90.0,
+                solar_altitude=45.0,
+                temp_conductor_max_c=line_data['MOT']
+            )
+
+            ampacity_amps = ampacity_details['ampacity']
+            voltage_kv = line_data['voltage_kv']
+            ampacity_mva = (ampacity_amps * voltage_kv * np.sqrt(3)) / 1000
+
+            # Calculate utilization with contingency flow
+            contingency_flow_mw = affected.get('contingency_flow_mw', affected['baseline_flow_mw'])
+            static_rating_mva = line_data['s_nom']
+
+            baseline_utilization_pct = (affected['baseline_flow_mw'] / static_rating_mva * 100) if static_rating_mva > 0 else 0
+            contingency_utilization_pct = (contingency_flow_mw / static_rating_mva * 100) if static_rating_mva > 0 else 0
+
+            # Determine status
+            if contingency_utilization_pct >= 100:
+                status = "Overload"
+                overloaded_count += 1
+            elif contingency_utilization_pct >= 95:
+                status = "Critical"
+                critical_count += 1
+            elif contingency_utilization_pct >= 80:
+                status = "Warning"
+                warning_count += 1
+            else:
+                status = "Normal"
+
+            contingency_results.append({
+                'line_id': affected['line_id'],
+                'line_name': str(line_data['branch_name']),
+                'conductor': str(line_data['conductor']),
+                'baseline_flow_mw': round(float(affected['baseline_flow_mw']), 2),
+                'contingency_flow_mw': round(float(contingency_flow_mw), 2),
+                'flow_increase_mw': round(float(affected.get('flow_increase_mw', 0)), 2),
+                'flow_increase_pct': round(float(affected.get('flow_increase_pct', 0)), 1),
+                'static_rating_mva': round(float(static_rating_mva), 1),
+                'ampacity_mva': round(float(ampacity_mva), 1),
+                'baseline_utilization_pct': round(float(baseline_utilization_pct), 1),
+                'contingency_utilization_pct': round(float(contingency_utilization_pct), 1),
+                'utilization_increase_pct': round(float(contingency_utilization_pct - baseline_utilization_pct), 1),
+                'status': status
+            })
+        except Exception as e:
+            print(f"Error analyzing line {affected['line_id']}: {e}")
+            continue
+
+    # Sort by utilization increase (most affected first)
+    contingency_results.sort(key=lambda x: x['utilization_increase_pct'], reverse=True)
+
+    return {
+        'failed_line': {
+            'line_id': failed_line_id,
+            'line_name': str(failed_line['branch_name']),
+            'flow_mw': round(float(failed_flow), 2),
+            'bus0': int(failed_line['bus0']),
+            'bus1': int(failed_line['bus1'])
+        },
+        'weather': {
+            'temperature_c': weather.temperature_c,
+            'wind_speed_ms': weather.wind_speed_ms,
+            'source': weather.source
+        },
+        'summary': {
+            'total_affected_lines': len(contingency_results),
+            'overloaded_lines': overloaded_count,
+            'critical_lines': critical_count,
+            'warning_lines': warning_count,
+            'redistributed_power_mw': round(float(failed_flow), 2)
+        },
+        'affected_lines': contingency_results
     }
 
 

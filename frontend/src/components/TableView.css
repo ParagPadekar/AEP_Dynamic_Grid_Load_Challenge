@@ -1,5 +1,5 @@
 /* TableView Styles */
-.table-view { max-width: 100%; padding: 1rem; }
+.table-view { max-width: 100%; width: 100%; padding: 1.5rem; }
 .table-controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
 .search-box input { padding: 0.75rem 1rem; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); width: 250px; font-size: 0.95rem; }
 .filter-buttons { display: flex; gap: 0.5rem; }

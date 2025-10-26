@@ -6,7 +6,7 @@
 import axios from 'axios';
 
 // API Base URL - change this if backend is on different host/port
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://aep-dlr-backend.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -122,6 +122,39 @@ const apiService = {
    */
   async getLinesSummary() {
     const response = await api.get('/lines/summary');
+    return response.data;
+  },
+
+  /**
+   * Get 24-hour time-lapse data for animation
+   * @param {Object} customWeather - Custom weather parameters
+   */
+  async get24HourTimelapse(customWeather = null) {
+    const params = {
+      weather_source: 'manual',
+      temp_ambient_c: customWeather?.temperature || 30.0,
+      wind_speed_ms: customWeather?.windSpeed || 2.0,
+      humidity_pct: customWeather?.humidity || 70.0,
+    };
+
+    const response = await api.get('/timelapse/24hour', { params });
+    return response.data;
+  },
+
+  /**
+   * N-1 Contingency Analysis: Simulate line failure
+   * @param {string} failedLineId - Line ID to simulate failure (e.g., "L0")
+   * @param {Object} customWeather - Custom weather parameters
+   */
+  async getN1Contingency(failedLineId, customWeather = null) {
+    const params = {
+      weather_source: 'manual',
+      temp_ambient_c: customWeather?.temperature || 30.0,
+      wind_speed_ms: customWeather?.windSpeed || 2.5,
+      humidity_pct: customWeather?.humidity || 70.0,
+    };
+
+    const response = await api.get(`/contingency/n1/${failedLineId}`, { params });
     return response.data;
   },
 };

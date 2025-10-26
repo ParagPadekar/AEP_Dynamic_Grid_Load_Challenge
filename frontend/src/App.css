@@ -152,18 +152,17 @@ body {
 .content-area {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 0;
   min-width: 0; /* Important for flex children */
-  max-width: 100%;
+  width: 100%;
 }
 
 .content-area.with-sidebar {
-  max-width: calc(100vw - 320px); /* Account for weather panel width */
+  width: 100%;
 }
 
 .content-area.full-width {
-  max-width: 100vw;
-  padding: 1.5rem 3rem; /* More horizontal padding when full width */
+  width: 100%;
 }
 
 /* Backend Error */

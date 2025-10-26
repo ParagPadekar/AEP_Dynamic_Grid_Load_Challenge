@@ -223,11 +223,11 @@ const MapView = ({ lines, weatherInfo }) => {
   return (
     <div className="map-view">
       <div className="map-header">
-        <h3>🗺️ Hawaii Transmission Grid - Live Status Map</h3>
+        <h3>Hawaii Transmission Grid - Live Status Map</h3>
         {weatherInfo && (
           <div className="map-weather-info">
-            <span>🌡️ {weatherInfo.temperature_c}°C</span>
-            <span>💨 {weatherInfo.wind_speed_ms} m/s</span>
+            <span>Temp: {weatherInfo.temperature_c}°C</span>
+            <span>Wind: {weatherInfo.wind_speed_ms} m/s</span>
             <span>{weatherInfo.description || weatherInfo.source}</span>
           </div>
         )}

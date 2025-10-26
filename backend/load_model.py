@@ -36,19 +36,48 @@ class LoadPredictor:
         """
         Create typical 24-hour load profile for power systems.
 
-        Pattern:
-        - Night (0-6): Low load ~60-70%
-        - Morning ramp (6-9): Increasing to ~90%
-        - Midday (9-17): Peak ~95-100%
-        - Evening peak (17-20): Maximum 100%
-        - Night (20-24): Decreasing to ~70%
+        Based on real utility load curves from Hawaii 40-bus PyPSA model
+        and EIA government data (https://www.eia.gov/todayinenergy/detail.php?id=42915)
+
+        Uses sine wave approximation with:
+        - Minimum at 6 AM: 90% of nominal (early morning low)
+        - Maximum at 6 PM: 110% of nominal (evening peak - residential A/C + cooking)
+        - Values normalized so baseline power flows represent typical midday conditions
+
+        This is realistic for Hawaii which has strong evening residential peaks.
+        Formula: load_factor = 0.1 * sin(2π * (hour/24) + π/2) + 1.0
         """
-        profile = {
-            0: 0.65, 1: 0.62, 2: 0.60, 3: 0.58, 4: 0.60, 5: 0.65,
-            6: 0.70, 7: 0.80, 8: 0.90, 9: 0.95, 10: 0.96, 11: 0.97,
-            12: 0.98, 13: 0.99, 14: 1.00, 15: 1.00, 16: 0.99, 17: 1.00,
-            18: 1.00, 19: 0.98, 20: 0.92, 21: 0.85, 22: 0.78, 23: 0.70,
-        }
+        # Real data from pypsa_load_scale.ipynb - sine wave approximation
+        # of actual utility load patterns for Hawaii grid
+        hourly_factors = [
+            1.0,    # 00:00 - Midnight
+            0.974,  # 01:00
+            0.95,   # 02:00
+            0.929,  # 03:00
+            0.913,  # 04:00
+            0.903,  # 05:00
+            0.9,    # 06:00 - Morning minimum (90%)
+            0.903,  # 07:00 - Start of morning ramp
+            0.913,  # 08:00
+            0.929,  # 09:00
+            0.95,   # 10:00
+            0.974,  # 11:00
+            1.0,    # 12:00 - Noon (nominal)
+            1.026,  # 13:00
+            1.05,   # 14:00
+            1.071,  # 15:00
+            1.087,  # 16:00
+            1.097,  # 17:00
+            1.1,    # 18:00 - Evening peak maximum (110%)
+            1.097,  # 19:00
+            1.087,  # 20:00
+            1.071,  # 21:00
+            1.05,   # 22:00
+            1.026,  # 23:00
+        ]
+
+        # Convert to dictionary for backward compatibility
+        profile = {hour: factor for hour, factor in enumerate(hourly_factors)}
         return profile
 
     def set_baseline_load(self, line_id: str, load_mw: float):
@@ -59,7 +88,7 @@ class LoadPredictor:
         self,
         line_id: str,
         timestamp: Optional[datetime] = None,
-        add_variability: bool = True,
+        add_variability: bool = False,
         temperature_c: Optional[float] = None,
         wind_speed_ms: Optional[float] = None,
         solar_altitude: Optional[float] = None,

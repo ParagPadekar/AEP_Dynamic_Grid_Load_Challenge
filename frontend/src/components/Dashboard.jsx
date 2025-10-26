@@ -18,7 +18,7 @@ const Dashboard = ({ onLineSelect, selectedScenario, customWeather }) => {
 
   useEffect(() => {
     fetchData();
-  }, [selectedScenario, customWeather]);
+  }, [selectedScenario, JSON.stringify(customWeather)]);
 
   const fetchData = async () => {
     try {
@@ -104,17 +104,17 @@ const Dashboard = ({ onLineSelect, selectedScenario, customWeather }) => {
               className={`toggle-btn ${viewMode === 'map' ? 'active' : ''}`}
               onClick={() => setViewMode('map')}
             >
-              🗺️ Map View
+              Map View
             </button>
             <button
               className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
               onClick={() => setViewMode('grid')}
             >
-              📊 Grid View
+              Grid View
             </button>
           </div>
           <button onClick={fetchData} className="refresh-button">
-            🔄 Refresh
+            Refresh
           </button>
         </div>
       </div>

@@ -21,6 +21,7 @@ class WeatherData(BaseModel):
     source: str  # "openweather", "scenario", "manual"
     location: Optional[str] = None
     description: Optional[str] = None
+    hour_of_day: Optional[int] = None  # For time-of-day load profiles (0-23)
 
 
 class WeatherService:
@@ -41,70 +42,104 @@ class WeatherService:
         "lon": -157.8581  # Honolulu longitude
     }
 
-    # Pre-defined demo scenarios
+    # Pre-defined demo scenarios organized by severity and time
     SCENARIOS = {
-        "extreme_heat": {
-            "name": "Extreme Heat - Critical Conditions",
-            "description": "Hot summer day, no wind - Expect critical overloads",
-            "temperature_c": 42.0,
+        # CRITICAL SCENARIOS - Worst case overloads
+        "critical_evening": {
+            "name": "🔥 CRITICAL: Heat Wave Evening Peak (6 PM)",
+            "description": "WORST CASE: 44°C heat + 110% load = Cascading failures",
+            "temperature_c": 44.0,
             "wind_speed_ms": 0.5,
-            "solar_altitude": 75.0,
+            "solar_altitude": 15.0,
             "wind_angle_deg": 90,
-            "humidity_pct": 65
+            "humidity_pct": 70,
+            "hour_of_day": 18
         },
-        "hot_day": {
-            "name": "Hot Day - Warning Conditions",
-            "description": "Typical hot summer afternoon with light breeze",
+        "critical_afternoon": {
+            "name": "🔥 CRITICAL: Heat Wave Afternoon (3 PM)",
+            "description": "Peak sun + high heat + rising load = Major overloads",
+            "temperature_c": 44.0,
+            "wind_speed_ms": 0.5,
+            "solar_altitude": 70.0,
+            "wind_angle_deg": 90,
+            "humidity_pct": 65,
+            "hour_of_day": 15
+        },
+
+        # WARNING SCENARIOS - High stress conditions
+        "warning_midday": {
+            "name": "⚠️ WARNING: Hot Summer Midday (12 PM)",
+            "description": "35°C, moderate load, some lines approaching limits",
             "temperature_c": 35.0,
             "wind_speed_ms": 1.5,
-            "solar_altitude": 60.0,
+            "solar_altitude": 75.0,
             "wind_angle_deg": 90,
-            "humidity_pct": 70
+            "humidity_pct": 70,
+            "hour_of_day": 12
         },
-        "normal_summer": {
-            "name": "Normal Summer - Moderate Conditions",
-            "description": "Warm day with steady wind",
+        "warning_evening": {
+            "name": "⚠️ WARNING: Hot Evening (6 PM)",
+            "description": "Still hot + evening peak load = Watch closely",
+            "temperature_c": 36.0,
+            "wind_speed_ms": 1.0,
+            "solar_altitude": 15.0,
+            "wind_angle_deg": 90,
+            "humidity_pct": 75,
+            "hour_of_day": 18
+        },
+
+        # NORMAL SCENARIOS - Typical operating conditions
+        "normal_midday": {
+            "name": "✅ NORMAL: Summer Midday (12 PM)",
+            "description": "30°C, normal breeze, all lines within limits",
             "temperature_c": 30.0,
             "wind_speed_ms": 2.5,
+            "solar_altitude": 75.0,
+            "wind_angle_deg": 90,
+            "humidity_pct": 75,
+            "hour_of_day": 12
+        },
+        "normal_morning": {
+            "name": "✅ NORMAL: Morning Ramp (9 AM)",
+            "description": "Comfortable morning, load increasing gradually",
+            "temperature_c": 27.0,
+            "wind_speed_ms": 2.0,
             "solar_altitude": 45.0,
             "wind_angle_deg": 90,
-            "humidity_pct": 75
+            "humidity_pct": 78,
+            "hour_of_day": 9
         },
-        "optimal": {
-            "name": "Optimal Conditions",
-            "description": "Cool temperature with good wind - Maximum ampacity",
-            "temperature_c": 20.0,
-            "wind_speed_ms": 4.0,
-            "solar_altitude": 30.0,
-            "wind_angle_deg": 90,
-            "humidity_pct": 60
-        },
-        "night_peak": {
-            "name": "Night Peak Load",
-            "description": "Evening peak hours, cooling down",
-            "temperature_c": 25.0,
+
+        # OPTIMAL SCENARIOS - Best conditions
+        "optimal_early": {
+            "name": "😎 OPTIMAL: Early Morning (6 AM)",
+            "description": "Minimum load (90%), cool temps - Best for maintenance",
+            "temperature_c": 24.0,
             "wind_speed_ms": 2.0,
-            "solar_altitude": 0.0,  # Night
+            "solar_altitude": 5.0,
             "wind_angle_deg": 90,
-            "humidity_pct": 80
+            "humidity_pct": 80,
+            "hour_of_day": 6
         },
-        "windy_day": {
-            "name": "Windy Day - High Cooling",
-            "description": "Strong trade winds - Great for ampacity",
+        "optimal_night": {
+            "name": "😎 OPTIMAL: Late Night (2 AM)",
+            "description": "Coolest temps + lowest load - Maximum capacity margin",
+            "temperature_c": 22.0,
+            "wind_speed_ms": 2.5,
+            "solar_altitude": 0.0,
+            "wind_angle_deg": 90,
+            "humidity_pct": 85,
+            "hour_of_day": 2
+        },
+        "optimal_windy": {
+            "name": "😎 OPTIMAL: Windy Conditions",
+            "description": "Strong trade winds provide excellent conductor cooling",
             "temperature_c": 28.0,
             "wind_speed_ms": 5.5,
             "solar_altitude": 50.0,
             "wind_angle_deg": 90,
-            "humidity_pct": 65
-        },
-        "cloudy_cool": {
-            "name": "Cloudy & Cool",
-            "description": "Overcast day with reduced solar heating",
-            "temperature_c": 22.0,
-            "wind_speed_ms": 3.0,
-            "solar_altitude": 20.0,  # Reduced due to clouds
-            "wind_angle_deg": 90,
-            "humidity_pct": 85
+            "humidity_pct": 65,
+            "hour_of_day": 14
         }
     }
 

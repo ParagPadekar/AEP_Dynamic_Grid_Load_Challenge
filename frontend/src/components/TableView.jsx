@@ -18,7 +18,7 @@ const TableView = ({ onLineSelect, selectedScenario, customWeather }) => {
 
   useEffect(() => {
     fetchData();
-  }, [selectedScenario, customWeather]);
+  }, [selectedScenario, JSON.stringify(customWeather)]);
 
   const fetchData = async () => {
     try {
@@ -157,7 +157,7 @@ const TableView = ({ onLineSelect, selectedScenario, customWeather }) => {
         </div>
 
         <button onClick={fetchData} className="refresh-btn">
-          🔄 Refresh
+          Refresh
         </button>
       </div>
 

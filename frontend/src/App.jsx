@@ -8,13 +8,15 @@ import Dashboard from './components/Dashboard';
 import TableView from './components/TableView';
 import Charts from './components/Charts';
 import WeatherControls from './components/WeatherControls';
+import TimeLapse from './components/TimeLapse';
+import Contingency from './components/Contingency';
 import apiService from './services/api';
 import './App.css';
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [selectedLine, setSelectedLine] = useState('L0');
-  const [selectedScenario, setSelectedScenario] = useState('normal_summer');
+  const [selectedScenario, setSelectedScenario] = useState('normal_midday');
   const [customWeather, setCustomWeather] = useState(null);
   const [backendStatus, setBackendStatus] = useState(null);
   const [showWeatherPanel, setShowWeatherPanel] = useState(true);
@@ -58,7 +60,7 @@ function App() {
       <header className="app-header">
         <div className="header-content">
           <div className="header-title">
-            <h1>⚡ IEEE 738 Dynamic Line Rating System</h1>
+            <h1> Dynamic Grid Monitoring System</h1>
             <p className="subtitle">
               Real-time transmission line capacity monitoring with weather-based calculations
             </p>
@@ -83,25 +85,37 @@ function App() {
             className={`nav-button ${activeView === 'dashboard' ? 'active' : ''}`}
             onClick={() => setActiveView('dashboard')}
           >
-            📊 Dashboard
+            Dashboard
           </button>
           <button
             className={`nav-button ${activeView === 'table' ? 'active' : ''}`}
             onClick={() => setActiveView('table')}
           >
-            📋 Table View
+            Table View
+          </button>
+          <button
+            className={`nav-button ${activeView === 'timelapse' ? 'active' : ''}`}
+            onClick={() => setActiveView('timelapse')}
+          >
+            Time-Lapse
+          </button>
+          <button
+            className={`nav-button ${activeView === 'contingency' ? 'active' : ''}`}
+            onClick={() => setActiveView('contingency')}
+          >
+            N-1 Analysis
           </button>
           <button
             className={`nav-button ${activeView === 'charts' ? 'active' : ''}`}
             onClick={() => setActiveView('charts')}
           >
-            📈 Charts & Analysis
+            Charts & Analysis
           </button>
           <button
             className={`nav-button ${showWeatherPanel ? 'active' : ''}`}
             onClick={() => setShowWeatherPanel(!showWeatherPanel)}
           >
-            🌦️ Weather
+            Weather
           </button>
         </nav>
       </header>
@@ -122,7 +136,7 @@ function App() {
         <main className={`content-area ${showWeatherPanel ? 'with-sidebar' : 'full-width'}`}>
           {!backendStatus?.healthy && (
             <div className="backend-error">
-              <h3>⚠️ Backend Connection Error</h3>
+              <h3>Backend Connection Error</h3>
               <p>{backendStatus?.error || 'Cannot connect to backend API'}</p>
               <p>Make sure the backend server is running at http://localhost:8000</p>
               <button onClick={checkBackendHealth}>Retry Connection</button>
@@ -147,6 +161,18 @@ function App() {
                 />
               )}
 
+              {activeView === 'contingency' && (
+                <Contingency
+                  customWeather={customWeather}
+                />
+              )}
+
+              {activeView === 'timelapse' && (
+                <TimeLapse
+                  customWeather={customWeather}
+                />
+              )}
+
               {activeView === 'charts' && (
                 <Charts
                   selectedLine={selectedLine}
@@ -163,14 +189,14 @@ function App() {
       <footer className="app-footer">
         <div className="footer-content">
           <div className="footer-info">
-            <span>Built for HackOHIO 2024</span>
+            <span>Built for HackOHIO 2025</span>
             <span>•</span>
             <span>IEEE 738 Thermal Rating Standard</span>
             <span>•</span>
             <span>Hawaii 40-Bus Test System</span>
           </div>
           <div className="footer-scenario">
-            Current Scenario: <strong>{selectedScenario.replace('_', ' ')}</strong>
+            {/* Current Scenario: <strong>{selectedScenario.replace('_', ' ')}</strong> */}
           </div>
         </div>
       </footer>
